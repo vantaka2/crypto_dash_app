@@ -15,8 +15,6 @@ server = app.server
 ## bootstamp CSS (From https://github.com/amyoshino/DASH_Tutorial_ARGO_Labs/blob/master/app.py)
 app.css.append_css(
     {'external_url':'https://cdn.rawgit.com/plotly/dash-app-stylesheets/2d266c578d2a6e8850ebce48fdb52759b2aef506/stylesheet-oil-and-gas.css'})
-
-##has the sql connection information (from 'secrets')
 sql_con = os.environ.get('pg_db')
 ## get market cap data frame
 def market_cap_df(pg_conn=sql_con):
@@ -150,7 +148,8 @@ app.layout = html.Div([
             ),
         ], className="row"
     )
-], className='ten columns offset-by-one'
+], className='eleven columns offset-by-one',
+    style={'backgroundColor':'#F1F1F1'}
 )
 
 ## Callbacks
@@ -214,11 +213,19 @@ def update_mc_by_coin(coin_select, date_filter):
         ) for i in coin_select
     ]
     layout = go.Layout(
-        title='Coin Level Market Cap',
+        title='Percent Change by coin',
         yaxis=dict(
-            title='Percent Change'    
+            title='Percent Change',     
         ),
-        hovermode='closest'
+        hovermode='closest',
+        margin=dict(
+            l=50,
+            r=50,
+            t=50,
+            b=50,
+            pad=10
+        ),
+        xaxis={'title':''}
     )
     figure = {'data':data,
     'layout':layout}
