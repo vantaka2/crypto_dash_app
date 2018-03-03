@@ -1,13 +1,6 @@
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
-import os
-
-
-
-import dash
-import dash_core_components as dcc
-import dash_html_components as html
 import pandas as pd
 import plotly.graph_objs as go
 from dash.dependencies import Input, Output
@@ -65,7 +58,7 @@ app.layout = html.Div([
             html.H2(children='Crypto Currency Dashboard',
                     style={'text-align':'center'},
                     className='six columns'),
-            html.H5(children="""Created by: Keerthan Vantakala
+            html.H5(children="""created by: keerthan vantakala
                              https://github.com/vantaka2""",
                     style={'float':'right'},
                     className='three columns')
