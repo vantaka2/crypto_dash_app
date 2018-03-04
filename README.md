@@ -1,4 +1,4 @@
-# crypto sentiment analysis 
+# Crypto Sentiment Analysis 
 
 Welcome! 
 
