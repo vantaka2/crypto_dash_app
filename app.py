@@ -102,11 +102,15 @@ app.layout = html.Div([
                 ),
             html.Div(
                 [
-                    html.P(children=["""Author: Keerthan Vantakala      """, html.A('GitHub', href = "https://github.com/vantaka2/crypto_dash_app")]),
-                    
-                    #html.A('GitHub', href = "https://github.com/vantaka2/crypto_dash_app"),
-                    
-                    html.P(html.A(html.Button('Submit Feedback'),href="https://github.com/vantaka2/crypto_dash_app/issues/new"))
+                    html.P(children=
+                        [
+                            """Author: Keerthan Vantakala      """, 
+                            html.A('( GitHub )', href = "https://github.com/vantaka2/crypto_dash_app")],
+                            style={'textAlign':'center'}
+                        ),
+                                        
+                    html.P(html.A(html.Button('Submit Feedback'),href="https://github.com/vantaka2/crypto_dash_app/issues/new",
+                    ),style={'textAlign':'center'}  )
                     ], className='two columns')
         ], className="row"
     ),
@@ -123,11 +127,11 @@ app.layout = html.Div([
                         ],
                         multi=True
                     ),
-                ], className='seven columns'
+                ], className='six columns'
             ),
             html.Div(
                 [
-                    html.P('Quick Filters'),
+                    dcc.Markdown("**Quick Coin Select**"),
                     dcc.RadioItems(
                         id='quick_filter',
                         options=[
@@ -140,7 +144,7 @@ app.layout = html.Div([
             ),
             html.Div(
                 [
-                    html.P('Date filter'),
+                    dcc.Markdown("**Date Filter**"),
                     dcc.RadioItems(
                         id='date_filter',
                         options=[
@@ -151,7 +155,7 @@ app.layout = html.Div([
                         labelStyle={'display': 'inline-block',
                                     'text-align':'left'},
                     ),
-                ], className='two columns'
+                ], className='three columns'
             ),
 
         ], className="row"
