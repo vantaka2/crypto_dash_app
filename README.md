@@ -8,7 +8,7 @@ The main purpose of this project is:
 
 1) Create a useful application for those interested in cryptocurrency
 
-2) Get hands on expiernce with various tools/technology I'm interested in.
+2) Get hands on experience with various tools/technology I'm interested in.
 
 I've broken up the project into two repositories, one holds the frontend code for the web applicaiton, the other holds the backend code. 
 
@@ -19,9 +19,9 @@ Backend: https://github.com/vantaka2/crypto_dash_app
 Here is a link to the current state of the web app: 
 https://crypto-sentiment-keerthan.herokuapp.com/ 
 
-(Please keep in mind this is running on heroku's free teir. In Heroku's free teir applications are put to sleep if no one uses it for 30 minutes, so the first person to check it out after its put to sleep will have a to wait a mintue or two for the app to start up again.)
+(Please keep in mind this is running on heroku's free tier. In Heroku's free tier applications are put to sleep if no one uses it for 30 minutes, so the first person to check it out after its put to sleep will have a to wait a minute or two for the app to start up again.)
 
-##Frontend
+## Frontend
 
 ### Framework
 
@@ -35,7 +35,7 @@ https://plot.ly/products/dash/
 
 ### Hosting
 
-The application is currently being hosted on Heroku. For the time being I am using the free teir until the application is in a better state or there is increased interest in it. Some options moving forward are to move it to Heroku's Standard plan or have it run on the AWS server that i'm already paying for to do the backend work.  
+The application is currently being hosted on Heroku. For the time being I am using the free tier until the application is in a better state or there is increased interest in it. Some options moving forward are to move it to Heroku's Standard plan or have it run on the AWS server that I am already paying for to do the backend work.  
 
 You can find the application here: 
 https://crypto-sentiment-keerthan.herokuapp.com/ 
@@ -50,11 +50,11 @@ Source: https://aesalazar.com/blog/3-professional-color-combinations-for-dashboa
 
 HEX color codes used: #F1F1F1, #202020, #7E909A, #1C4E80, #A5D8DD, #EA6A47, #0091D5
 
-##Backend
+## Backend
 
-###Server 
+### Server 
 
-The backend proceses are running on 2 AWS servers. 
+The backend processes are running on 2 AWS servers. 
 
 1 m5.large & 1 t2.micro. 
 
