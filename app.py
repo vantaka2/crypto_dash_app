@@ -50,32 +50,31 @@ df_red_agg = reddit_agg_by_day(sql_con)
 
 ## layout
 app.layout = html.Div([
-    html.H3(
-        children= 'Crypto Currency Sentiment Analysis',
-        style = dict(backgroundColor="#1C4E80",
-            color='#ffffff ',
-            textAlign='center'
-        )
-    ),
+    ## Top header Author, Title & submit Feedback Button 
+            html.H3(
+            children= 'Crypto Currency Sentiment Analysis',
+            style = dict(backgroundColor="#1C4E80",
+                color='#ffffff ',
+                textAlign='center')
+                ),
+    ### KPI Metrics Marketcap, MC percent change, Metnions & mentions Pct Change
     html.Div(
         [
-            # html.Div(id='display_pct_change',
-            #     className='three columns'),
             html.Div(
                 [
                     html.H5(children="Market Cap",
                     style={'textAlign':'center'}),
                     html.Div(id = 'display_total_mc',
-                    style={'textAlign':'center'})
+                    style={'textAlign':'center','textSize':25})
                 ], className = 'two columns'
                 ),
             html.Div(
                 [
-                    html.H5(children="MarketCap Percent Change",
+                    html.H5(children="MarketCap % Change",
                     style={'textAlign':'center'}),
                     html.Div(id='display_pct_change',
                     style={'textAlign':'center',
-                        'fontsize':25,
+                        'fontSize':25,
                         'size':25,
                         })
                 ], className = 'two columns'
@@ -93,32 +92,32 @@ app.layout = html.Div([
                 ),
             html.Div(
                 [
-                    html.H5(children="Mentions Percent Change",
+                    html.H5(children="Daily Mentions % Change",
                     style={'textAlign':'center'}),
-                    html.Div(children='WORK IN PROGRESS',
+                    html.Div(id='mention_pct_change',
                     style={'textAlign':'center',
                         'fontsize':15})
                 ], className = 'two columns'
                 ),
             html.Div(
                 [
-                    html.P(children=
-                        [
-                            """Author: Keerthan Vantakala      """, 
-                            html.A('( GitHub )', href = "https://github.com/vantaka2/crypto_dash_app")],
-                            style={'textAlign':'center'}
-                        ),
-                                        
+                html.P(children=["""Author: Keerthan Vantakala      """,
+                html.A('( GitHub )', href = "https://github.com/vantaka2/crypto_dash_app")
+                    ],)
+                ],style={'float':'center','verticalAlign' : "bottom"}, className = 'two columns'),
+            html.Div(
+                [                                       
                     html.P(html.A(html.Button('Submit Feedback'),href="https://github.com/vantaka2/crypto_dash_app/issues/new",
                     ),style={'textAlign':'center'}  )
                     ], className='two columns')
         ], className="row"
     ),
+    ## Filters 
     html.Div(
         [
             html.Div(
                 [
-                    html.P('Search by Coin: (Please limit to 10 coins! This app is not running on a powerful server!'),
+                    dcc.Markdown("**Search by Coin** (Please limit to 10 coins! This app is not running on a powerful server!)"),
                     dcc.Dropdown(
                         id='coin_select',
                         options=[
@@ -160,41 +159,42 @@ app.layout = html.Div([
 
         ], className="row"
     ),
+    ## Total MC chart & MC Percent Change 
     html.Div(
         [
             html.Div(
                 [
                     dcc.Graph(
-                        id='total_mc'
+                        id='total_mc',style={'marginLeft': 5,'marginRight':5}
                     ),
-                ], className='six columns'
+                ], className='six columns',
             ),
             html.Div(
                 [
                     dcc.Graph(
-                        id='mc_by_coin'
+                        id='mc_by_coin',style={'marginRight':5,'marginLeft': 5}
                     ),
                 ], className='six columns'
             )
-        ], className="row"
+        ], className="row", style={'marginBottom': 15, 'marginTop': 5,'marginRight':5}
     ),
     html.Div(
         [
             html.Div(
                 [
                     dcc.Graph(
-                        id='reddit_trends'
+                        id='reddit_trends',style={'marginRight':5,'marginLeft': 5}
                     ),
                     ], className='six columns'
             ),
             html.Div(
                 [
                     dcc.Graph(
-                        id='reddit_post_agg'
+                        id='reddit_post_agg',style={'marginRight':5,'marginLeft': 5}
                     ),
                 ], className='six columns'
             ),
-        ], className="row"
+        ], className="row", style={'marginBottom': 15, 'marginTop': 5}
     )
 ], #className='ten columns offset-by-one',
     style={'backgroundColor':'#F1F1F1'}
@@ -205,12 +205,11 @@ app.layout = html.Div([
     dash.dependencies.Output('coin_select', 'value'),
     [dash.dependencies.Input('quick_filter', 'value')])
 def set_coin_select(qf_value):
-    print(qf_value)
+    
     if qf_value == None:
         value = ['Nano', 'NEO', 'Walton']
     else:
         value = df_mc[df_mc['current_rank'] <= qf_value]['name'].unique()
-    print(value)
     return value
 
 @app.callback(
@@ -219,6 +218,7 @@ def set_coin_select(qf_value):
     dash.dependencies.Input('date_filter', 'value')])
 def pct_change(coin_select, date_filter):
     df = filter_df(df_mc, coin_select, date_filter)
+    print(coin_select)
     start = df[df['insert_timestamp'] == df.min()['insert_timestamp']].sum()['market_cap_usd']
     end = df[df['insert_timestamp'] == df.max()['insert_timestamp']].sum()['market_cap_usd']
     pct_change = round(((end-start)/start)*100)
@@ -241,16 +241,23 @@ def mc_total(coin_select):
     tmc = int(df_stg.sum()['market_cap_usd']/1000000)
     return '{:,} MM'.format(tmc)
 
+@app.callback(
+    dash.dependencies.Output('mention_pct_change', 'children'),
+    [dash.dependencies.Input('coin_select', 'value')])
+def mc_total(coin_select):
+    df_stg = df_red_agg[df_red_agg['name'].isin(coin_select)]
+    df2 = df_stg.groupby('created', as_index=False).sum()
+    list1 = list(df2.num_posts.pct_change())
+    pct_change = int(list1[-2]*100)  
+    return " {} % " .format(pct_change)
+
 #total_MC_Graph
 @app.callback(
     dash.dependencies.Output('total_mc', 'figure'),
     [dash.dependencies.Input('coin_select', 'value'),
     dash.dependencies.Input('date_filter', 'value')])
 def update_total_mc(coin_select, date_filter):
-    print("Coin_select: {}".format(coin_select))
-    print("date_filter: {}".format(date_filter))
     df_total_mc = filter_df(df_mc, coin_select, date_filter)
-    print(df_total_mc.head())
     data = [{
         'x':df_total_mc.groupby('insert_timestamp', as_index=False).agg('sum').sort_values('insert_timestamp')['insert_timestamp'],
         'y':df_total_mc.groupby('insert_timestamp', as_index=False).agg('sum').sort_values('insert_timestamp')['market_cap_usd'],
@@ -278,7 +285,7 @@ def update_mc_by_coin(coin_select, date_filter):
         ) for i in coin_select
     ]
     layout = go.Layout(
-        title='Percent Change by coin',
+        title='MC % Change by coin',
         yaxis=dict(
             title='Percent Change',     
         ),
@@ -310,8 +317,10 @@ def update_reddit_bar(coin_select, date_filter):
         ) for i in coin_select
     ]
     layout = go.Layout(
-        title='Reddit Posts by Day',
-        barmode='stack'
+        title='Mentions per Day',
+        barmode='stack', 
+        yaxis=dict(title='Mention Count'),
+        hovermode='closest'
         )
     figure={'data':data,
         'layout':layout}
@@ -362,7 +371,6 @@ def filter_df(df=None, coin_select=None, date_filter=None):
     for i in coin_list:
         df_stg_3 = df_stg_2[df_stg_2['name']== i]
         base = df_stg_3[df_stg_3['insert_timestamp'] == df_stg_3.min()['insert_timestamp']]['market_cap_usd'].reset_index(drop=True)[0]
-        print(base)
         df_stg_3['pct_change'] = (((df_stg_3['market_cap_usd']-base)/ base) * 100 )
         frame.append(df_stg_3)
     df_stg_4 = pd.concat(frame)
