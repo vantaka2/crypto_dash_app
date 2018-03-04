@@ -15,8 +15,6 @@ server = app.server
 ## bootstamp CSS (From https://github.com/amyoshino/DASH_Tutorial_ARGO_Labs/blob/master/app.py)
 app.css.append_css(
     {'external_url':'https://cdn.rawgit.com/plotly/dash-app-stylesheets/2d266c578d2a6e8850ebce48fdb52759b2aef506/stylesheet-oil-and-gas.css'})
-
-##has the sql connection information (from 'secrets')
 sql_con = os.environ.get('pg_db')
 ## get market cap data frame
 def market_cap_df(pg_conn=sql_con):
@@ -52,24 +50,71 @@ df_red_agg = reddit_agg_by_day(sql_con)
 
 ## layout
 app.layout = html.Div([
+    html.H3(
+        children= 'Crypto Currency Sentiment Analysis',
+        style = dict(backgroundColor="#1C4E80",
+            color='#ffffff ',
+            textAlign='center'
+        )
+    ),
     html.Div(
         [
-            html.Div(id='display_pct_change',
-                className='three columns'),
-            html.H2(children='Crypto Currency Dashboard',
-                    style={'text-align':'center'},
-                    className='six columns'),
-            html.H5(children="""created by: keerthan vantakala
-                             https://github.com/vantaka2""",
-                    style={'float':'right'},
-                    className='three columns')
+            # html.Div(id='display_pct_change',
+            #     className='three columns'),
+            html.Div(
+                [
+                    html.H5(children="Market Cap",
+                    style={'textAlign':'center'}),
+                    html.Div(id = 'display_total_mc',
+                    style={'textAlign':'center'})
+                ], className = 'two columns'
+                ),
+            html.Div(
+                [
+                    html.H5(children="MarketCap Percent Change",
+                    style={'textAlign':'center'}),
+                    html.Div(id='display_pct_change',
+                    style={'textAlign':'center',
+                        'fontsize':25,
+                        'size':25,
+                        })
+                ], className = 'two columns'
+                ),
+            html.Div(
+                [
+                    html.H5(children="Mentions",
+                    style={'textAlign':'center'}),
+                    html.Div(id='reddit_mentions',
+                    style={'textAlign':'center',
+                        'fontsize':25,
+                        'size':25,
+                        })
+                ], className = 'two columns'
+                ),
+            html.Div(
+                [
+                    html.H5(children="Mentions Percent Change",
+                    style={'textAlign':'center'}),
+                    html.Div(children='WORK IN PROGRESS',
+                    style={'textAlign':'center',
+                        'fontsize':15})
+                ], className = 'two columns'
+                ),
+            html.Div(
+                [
+                    html.P(children=["""Author: Keerthan Vantakala      """, html.A('GitHub', href = "https://github.com/vantaka2/crypto_dash_app")]),
+                    
+                    #html.A('GitHub', href = "https://github.com/vantaka2/crypto_dash_app"),
+                    
+                    html.P(html.A(html.Button('Submit Feedback'),href="https://github.com/vantaka2/crypto_dash_app/issues/new"))
+                    ], className='two columns')
         ], className="row"
     ),
     html.Div(
         [
             html.Div(
                 [
-                    html.P('Search by Coin:'),
+                    html.P('Search by Coin: (Please limit to 10 coins! This app is not running on a powerful server!'),
                     dcc.Dropdown(
                         id='coin_select',
                         options=[
@@ -87,10 +132,7 @@ app.layout = html.Div([
                         id='quick_filter',
                         options=[
                             {'label':'Top 5', 'value':5},
-                            {'label':'Top 10', 'value':10},
-                            {'label':'Top 25', 'value':25},
-                            {'label':'Top 50', 'value':50},
-                            {'label':'Top 100', 'value':100}
+                            {'label':'Top 10', 'value':10}
                         ],
                         labelStyle={'display':'inline-block'}
                     ),
@@ -150,7 +192,8 @@ app.layout = html.Div([
             ),
         ], className="row"
     )
-], className='ten columns offset-by-one'
+], #className='ten columns offset-by-one',
+    style={'backgroundColor':'#F1F1F1'}
 )
 
 ## Callbacks
@@ -160,7 +203,7 @@ app.layout = html.Div([
 def set_coin_select(qf_value):
     print(qf_value)
     if qf_value == None:
-        value = ['Nano', 'VeChain', 'Enigma']
+        value = ['Nano', 'NEO', 'Walton']
     else:
         value = df_mc[df_mc['current_rank'] <= qf_value]['name'].unique()
     print(value)
@@ -175,7 +218,24 @@ def pct_change(coin_select, date_filter):
     start = df[df['insert_timestamp'] == df.min()['insert_timestamp']].sum()['market_cap_usd']
     end = df[df['insert_timestamp'] == df.max()['insert_timestamp']].sum()['market_cap_usd']
     pct_change = round(((end-start)/start)*100)
-    return 'Pct Change: {} %'.format(pct_change)
+    return ' {} % '.format(pct_change)
+
+@app.callback(
+    dash.dependencies.Output('reddit_mentions', 'children'),
+    [dash.dependencies.Input('coin_select', 'value'),
+    dash.dependencies.Input('date_filter', 'value')])
+def mentions(coin_select, date_filter):
+    df_reddit = filter_reddit(df_red_agg, coin_select, date_filter)
+    return df_reddit.sum()['num_posts']
+
+@app.callback(
+    dash.dependencies.Output('display_total_mc', 'children'),
+    [dash.dependencies.Input('coin_select', 'value')])
+def mc_total(coin_select):
+    df = df_mc[df_mc['insert_timestamp'] == df_mc.max()['insert_timestamp']]
+    df_stg = df[df['name'].isin(coin_select)]
+    tmc = int(df_stg.sum()['market_cap_usd']/1000000)
+    return '{:,} MM'.format(tmc)
 
 #total_MC_Graph
 @app.callback(
@@ -214,11 +274,19 @@ def update_mc_by_coin(coin_select, date_filter):
         ) for i in coin_select
     ]
     layout = go.Layout(
-        title='Coin Level Market Cap',
+        title='Percent Change by coin',
         yaxis=dict(
-            title='Percent Change'    
+            title='Percent Change',     
         ),
-        hovermode='closest'
+        hovermode='closest',
+        margin=dict(
+            l=50,
+            r=50,
+            t=50,
+            b=50,
+            pad=10
+        ),
+        xaxis={'title':''}
     )
     figure = {'data':data,
     'layout':layout}
