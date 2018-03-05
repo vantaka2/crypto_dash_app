@@ -62,41 +62,35 @@ app.layout = html.Div([
         [
             html.Div(
                 [
-                    html.H5(children="Market Cap",
+                    html.H6(children="Market Cap",
                     style={'textAlign':'center'}),
                     html.Div(id = 'display_total_mc',
-                    style={'textAlign':'center','textSize':25})
+                    style={'textAlign':'center'})
                 ], className = 'two columns'
                 ),
             html.Div(
                 [
-                    html.H5(children="MarketCap % Change",
+                    html.H6(children="Market Cap % Change",
                     style={'textAlign':'center'}),
                     html.Div(id='display_pct_change',
-                    style={'textAlign':'center',
-                        'fontSize':25,
-                        'size':25,
-                        })
+                    style={'textAlign':'center' })
                 ], className = 'two columns'
                 ),
             html.Div(
                 [
-                    html.H5(children="Mentions",
+                    html.H6(children="Mentions",
                     style={'textAlign':'center'}),
                     html.Div(id='reddit_mentions',
                     style={'textAlign':'center',
-                        'fontsize':25,
-                        'size':25,
                         })
                 ], className = 'two columns'
                 ),
             html.Div(
                 [
-                    html.H5(children="Daily Mentions % Change",
+                    html.H6(children="Daily Mentions % Change",
                     style={'textAlign':'center'}),
                     html.Div(id='mention_pct_change',
-                    style={'textAlign':'center',
-                        'fontsize':15})
+                    style={'textAlign':'center'})
                 ], className = 'two columns'
                 ),
             html.Div(
@@ -196,7 +190,7 @@ app.layout = html.Div([
             ),
         ], className="row", style={'marginBottom': 15, 'marginTop': 5}
     )
-], #className='ten columns offset-by-one',
+], className='ten columns offset-by-one',
     style={'backgroundColor':'#F1F1F1'}
 )
 
