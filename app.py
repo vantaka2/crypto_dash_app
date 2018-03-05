@@ -190,11 +190,7 @@ app.layout = html.Div([
             ),
         ], className="row", style={'marginBottom': 15, 'marginTop': 5}
     )
-<<<<<<< HEAD
 ], 
-=======
-], className='ten columns offset-by-one',
->>>>>>> f6c1c18edf43aefd4130cafe7aff2c13e2554e9d
     style={'backgroundColor':'#F1F1F1'}
 )
 
