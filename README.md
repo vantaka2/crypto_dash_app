@@ -12,9 +12,9 @@ The main purpose of this project is:
 
 I've broken up the project into two repositories, one holds the frontend code for the web applicaiton, the other holds the backend code. 
 
-Frontend: https://github.com/vantaka2/crypto_sentiment_analysis-
+Backend: https://github.com/vantaka2/crypto_sentiment_analysis-
 
-Backend: https://github.com/vantaka2/crypto_dash_app
+Frontend: https://github.com/vantaka2/crypto_dash_app
 
 Here is a link to the current state of the web app: 
 https://crypto-sentiment-keerthan.herokuapp.com/ 
