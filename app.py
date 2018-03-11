@@ -6,12 +6,12 @@ import dash_html_components as html
 print('html')
 import pandas as pd
 print('imported pandas')
-import plotly.graph_objs as go
-print('imported go')
 from dash.dependencies import Input, Output
 print("imported dash dependencies")
 import os
-
+print("os")
+import plotly.graph_objs as go
+print('imported go')
 
 
 
