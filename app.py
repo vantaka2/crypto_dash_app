@@ -126,7 +126,7 @@ app.layout = html.Div([
                     html.Div("Quick Coin Select",
                         style={'text-align':'center'}),
                     dcc.RadioItems(
-                        id='quick_filter',note
+                        id='quick_filter',
                         options=[
                             {'label':'Top 5', 'value':5},
                             {'label':'Top 10', 'value':10}
