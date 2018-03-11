@@ -1,10 +1,17 @@
 import dash
+print('imported dash')
 import dash_core_components as dcc
+print('dcc')
 import dash_html_components as html
+print('html')
 import pandas as pd
+print('imported pandas')
 import plotly.graph_objs as go
+print('imported go')
 from dash.dependencies import Input, Output
+print("imported dash dependencies")
 import os
+
 
 
 
@@ -16,7 +23,7 @@ server = app.server
 app.css.append_css(
     {'external_url':'https://cdn.rawgit.com/plotly/dash-app-stylesheets/2d266c578d2a6e8850ebce48fdb52759b2aef506/stylesheet-oil-and-gas.css'})
 sql_con = os.environ.get('pg_db')
-
+print("set sql_con")
 def mentions_marketcap(pg_conn = sql_con):
     sql = """Select e.name, count(distinct a.post_id) as post_count,c.market_cap_usd , b.created:: date 
             from coin.xref_post_to_coin a
@@ -85,7 +92,7 @@ coin_list = list(df_mc['name'].unique())
 df_red_agg = reddit_agg_by_day(sql_con)
 df_post = reddit_posts(sql_con) 
 df_scatter = mentions_marketcap()
-
+print("ran all sql")
 ## layout
 app.layout = html.Div([
     ## Top header Author, Title & submit Feedback Button
