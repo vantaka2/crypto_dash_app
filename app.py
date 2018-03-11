@@ -1,17 +1,10 @@
 import dash
-print('imported dash')
 import dash_core_components as dcc
-print('dcc')
 import dash_html_components as html
-print('html')
 import pandas as pd
-print('imported pandas')
 from dash.dependencies import Input, Output
-print("imported dash dependencies")
 import os
-print("os")
 import plotly.graph_objs as go
-print('imported go')
 
 
 
