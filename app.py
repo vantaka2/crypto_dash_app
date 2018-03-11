@@ -5,8 +5,6 @@ import pandas as pd
 import plotly.graph_objs as go
 from dash.dependencies import Input, Output
 import os
-import logging
-from datetime import datetime, date, timedelta
 
 
 
