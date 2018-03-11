@@ -5,7 +5,6 @@ dash==0.21.0
 dash-core-components==0.21.0rc1
 dash-html-components==0.9.0
 dash-renderer==0.11.3
-dash-table-experiments==0.6.0
 decorator==4.2.1
 Flask==0.12.2
 Flask-Compress==1.4.0
