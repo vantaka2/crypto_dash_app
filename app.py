@@ -237,19 +237,19 @@ app.layout = html.Div([
     ),
     html.Div(
         [
-            html.Div(
-                [   dcc.Tabs(
-                        tabs=[
-                            {'label': 'Reddit Post Trends', 'value': 1},
-                            {'label': 'Sentiment by Coin', 'value': 2},
-                            {'label': 'Mentions by Day', 'value': 3}
-                        ],
-                        value = 2,
-                        id='tabs',
-                    ),
-                    html.Div(id='tab-output')
-                    ], className='six columns'
-            ),
+            # html.Div(
+            #     [   dcc.Tabs(
+            #             tabs=[
+            #                 {'label': 'Reddit Post Trends', 'value': 1},
+            #                 {'label': 'Sentiment by Coin', 'value': 2},
+            #                 {'label': 'Mentions by Day', 'value': 3}
+            #             ],
+            #             value = 2,
+            #             id='tabs',
+            #         ),
+            #         html.Div(id='tab-output')
+            #         ], className='six columns'
+            # ),
             html.Div(
                 [dcc.Graph(id = 'scatterpolot'), 
                     ], className='six columns'
@@ -405,91 +405,91 @@ def update_mc_by_coin(coin_select, date_filter):
 
 
 
-#reddit post trends
-@app.callback(
-    dash.dependencies.Output('tab-output', 'children'),
-    [dash.dependencies.Input('coin_select', 'value'),
-     dash.dependencies.Input('date_filter', 'value'),
-     dash.dependencies.Input('tabs','value')])
-def update_tabs(coin_select, date_filter,tabs):
-    if tabs == 1: 
-        df_2 = filter_reddit(df_rt, coin_select, date_filter)
-        df_trends = df_2.sort_values(['diff']).reset_index(drop=True)
-        posts = list(df_trends['post_id'].unique())
-        print(df_trends)
-        data2 = [
-            go.Scatter( 
-                x=df_trends[df_trends['post_id'] == i]['diff'],
-                y=df_trends[df_trends['post_id'] == i]['score'],
-                mode='line',
-                opacity=0.8,
-                name=str(df_trends[df_trends['post_id'] == i]['name'].unique()[0]),
-                hovertext=str(df_trends[df_trends['post_id'] == i]['title'].unique()[0])
-            ) for i in posts
-        ]
-        layout = go.Layout(
-            title='Reddit Post Trends',
-            yaxis=dict(
-                title='Score'
-            ),
-            hovermode='closest',
-            showlegend=False
-        )
-        figure1 = {
-        'data':data2,
-        'layout':layout
-        }
-        return html.Div([
-            dcc.Graph(
-            id='graph',
-            figure=figure1
-        )
-        ])
-    elif tabs == 2:
-        df_reddit = filter_reddit(df_red_agg, coin_select, date_filter)
-        df_reddit2 = df_reddit.groupby(by=['sentiment','name'],as_index=False).sum()
-        sentiment = ['Neutral','Negative','Positive']
-        data = [
-            go.Bar(
-                x = df_reddit2[df_reddit2['sentiment'] == i]['name'],
-                y = df_reddit2[df_reddit2['sentiment'] == i]['num_posts'],
-                name = i
-            ) for i in sentiment 
-        ]
-        layout = go.Layout(
-            title='Sentiment By Coin',
-            yaxis=dict(
-                title='Mention Count'
-            )
-        )
-        figure1={'data':data,
-            'layout':layout}
-        return html.Div([
-            dcc.Graph(id='graph',
-            figure = figure1)])
+# #reddit post trends
+# @app.callback(
+#     dash.dependencies.Output('tab-output', 'children'),
+#     [dash.dependencies.Input('coin_select', 'value'),
+#      dash.dependencies.Input('date_filter', 'value'),
+#      dash.dependencies.Input('tabs','value')])
+# def update_tabs(coin_select, date_filter,tabs):
+#     if tabs == 1: 
+#         df_2 = filter_reddit(df_rt, coin_select, date_filter)
+#         df_trends = df_2.sort_values(['diff']).reset_index(drop=True)
+#         posts = list(df_trends['post_id'].unique())
+#         print(df_trends)
+#         data2 = [
+#             go.Scatter( 
+#                 x=df_trends[df_trends['post_id'] == i]['diff'],
+#                 y=df_trends[df_trends['post_id'] == i]['score'],
+#                 mode='line',
+#                 opacity=0.8,
+#                 name=str(df_trends[df_trends['post_id'] == i]['name'].unique()[0]),
+#                 hovertext=str(df_trends[df_trends['post_id'] == i]['title'].unique()[0])
+#             ) for i in posts
+#         ]
+#         layout = go.Layout(
+#             title='Reddit Post Trends',
+#             yaxis=dict(
+#                 title='Score'
+#             ),
+#             hovermode='closest',
+#             showlegend=False
+#         )
+#         figure1 = {
+#         'data':data2,
+#         'layout':layout
+#         }
+#         return html.Div([
+#             dcc.Graph(
+#             id='graph',
+#             figure=figure1
+#         )
+#         ])
+#     elif tabs == 2:
+#         df_reddit = filter_reddit(df_red_agg, coin_select, date_filter)
+#         df_reddit2 = df_reddit.groupby(by=['sentiment','name'],as_index=False).sum()
+#         sentiment = ['Neutral','Negative','Positive']
+#         data = [
+#             go.Bar(
+#                 x = df_reddit2[df_reddit2['sentiment'] == i]['name'],
+#                 y = df_reddit2[df_reddit2['sentiment'] == i]['num_posts'],
+#                 name = i
+#             ) for i in sentiment 
+#         ]
+#         layout = go.Layout(
+#             title='Sentiment By Coin',
+#             yaxis=dict(
+#                 title='Mention Count'
+#             )
+#         )
+#         figure1={'data':data,
+#             'layout':layout}
+#         return html.Div([
+#             dcc.Graph(id='graph',
+#             figure = figure1)])
 
-    elif tabs ==3:
-        df_reddit = filter_reddit(df_red_agg, coin_select, date_filter)
-        df_reddit2 = df_reddit.groupby(by=['created','name'],as_index=False).sum()
-        data = [
-            go.Bar(
-                x=df_reddit2[df_reddit2['name'] == i]['created'],
-                y=df_reddit2[df_reddit2['name'] == i]['num_posts'],
-                name = i#,
-                #hovertext=df_reddit[df_reddit['name'] == i]['sentiment']
-            ) for i in coin_select
-        ]
-        layout = go.Layout(
-            title='Mentions per Day',
-            barmode='stack', 
-            yaxis=dict(title='Mention Count'),
-            hovermode='closest'
-            )
-        figure1={'data':data,
-            'layout':layout}
-        return html.Div([
-            dcc.Graph(id='graph',
-            figure = figure1)])
+#     elif tabs ==3:
+#         df_reddit = filter_reddit(df_red_agg, coin_select, date_filter)
+#         df_reddit2 = df_reddit.groupby(by=['created','name'],as_index=False).sum()
+#         data = [
+#             go.Bar(
+#                 x=df_reddit2[df_reddit2['name'] == i]['created'],
+#                 y=df_reddit2[df_reddit2['name'] == i]['num_posts'],
+#                 name = i#,
+#                 #hovertext=df_reddit[df_reddit['name'] == i]['sentiment']
+#             ) for i in coin_select
+#         ]
+#         layout = go.Layout(
+#             title='Mentions per Day',
+#             barmode='stack', 
+#             yaxis=dict(title='Mention Count'),
+#             hovermode='closest'
+#             )
+#         figure1={'data':data,
+#             'layout':layout}
+#         return html.Div([
+#             dcc.Graph(id='graph',
+#             figure = figure1)])
 
 
 
