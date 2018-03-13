@@ -81,7 +81,7 @@ def reddit_trends_df(pg_conn=sql_con):
 
 df_rt = reddit_trends_df(sql_con)
 df_mc = market_cap_df(sql_con)
-coin_list = list(df_mc['name'].unique())
+coin_list = list(df_mc['name'].sort_values().unique())
 df_red_agg = reddit_agg_by_day(sql_con)
 df_post = reddit_posts(sql_con) 
 df_scatter = mentions_marketcap()
