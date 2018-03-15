@@ -6,30 +6,26 @@ from dash.dependencies import Input, Output
 import os
 import plotly.graph_objs as go
 
-
-
 app = dash.Dash(__name__)
 server = app.server
-
 
 ## bootstamp CSS (From https://github.com/amyoshino/DASH_Tutorial_ARGO_Labs/blob/master/app.py)
 app.css.append_css(
     {'external_url':'https://cdn.rawgit.com/plotly/dash-app-stylesheets/2d266c578d2a6e8850ebce48fdb52759b2aef506/stylesheet-oil-and-gas.css'})
 sql_con = os.environ.get('pg_db')
 print("set sql_con")
-def mentions_marketcap(pg_conn = sql_con):
-    sql = """Select e.name, count(distinct a.post_id) as post_count,c.market_cap_usd , b.created:: date 
-            from coin.xref_post_to_coin a
-            inner join coin.dim_reddit_post b
-            on a.post_id = b.post_id
-            inner join (select id, avg(market_cap_usd) as market_cap_usd, insert_timestamp:: date from coin.price_24h where insert_timestamp >= current_date -8 group by 1,3 ) c
-            on a.coin_id = c.id and b.created:: date = c.insert_timestamp:: date
-            inner join coin.coin_rank d
-            on a.coin_id = d.id
-            inner join coin.dim_coin e
-            on a.coin_id = e.id
-            where coin_id is not null and created >= current_date -8 and d.current_rank < 101
-            group by 1,3,4;"""
+
+def reddit_post_info(pg_conn = sql_con):
+    sql = """
+        Select 
+            post_id, 
+            created, 
+            title, 
+            sentiment, 
+            confidence, 
+            coin_name
+        From 
+            coin.reddit_post_info """
     df = pd.read_sql(sql,pg_conn)
     return df
 
@@ -37,55 +33,26 @@ def mentions_marketcap(pg_conn = sql_con):
 def market_cap_df(pg_conn=sql_con):
     """Returns the dataframe used for marketcap graphs"""
     sql = """
-    select id, name, current_rank, last_updated,insert_timestamp, market_cap_usd
+    select name as coin_name, last_updated, insert_timestamp, market_cap_usd
     From coin.mc_graph_data 
-    group by 1,2,3,4,5,6
-        """
-    df = pd.read_sql(sql, pg_conn)
-    return df
-## execute mc data function:
-def reddit_posts(pg_conn=sql_con):
-    "returns all reddit posts "
-    sql = """Select title, 
-                --c.source, a.post_id, 
-                b.score, c.sentiment, c.confidence 
-                --, array_agg(d.keyword) as keyword
-            from coin.dim_reddit_post a
-            inner join (Select max(score) as score, post_id from coin.reddit_post_trends group by 2) b
-            on a.post_id = b.post_id
-            inner join coin.sentiment c
-            on a.post_id = c.source_id 
-            inner join (select post_id, unnest(keyword) as keyword from coin.xref_post_to_coin d group by 1,2) d
-            on a.post_id = d.post_id
-            where created >= current_Date -7
-            and b.score >10 
-            and d.keyword != '{null}'
-            group by 1,2,3,4"""
-    df = pd.read_sql(sql,pg_conn)
-    return df
-
-def reddit_agg_by_day(pg_conn=sql_con):
-    "queries database for reddit post data"
-    sql = """select num_posts, name, created, sentiment
-        from coin.reddit_post_by_day_agg"""
+    group by 1,2,3,4
+    """
     df = pd.read_sql(sql, pg_conn)
     return df
 
 def reddit_trends_df(pg_conn=sql_con):
     "queries database for reddit post trends data"
-    sql = """Select post_id, created, title, diff, score, num_comments, name
+    sql = """Select post_id, created, diff as delta_minute, score, num_comments
     from coin.reddit_trends
     where diff <= 1000 """
     df = pd.read_sql(sql, pg_conn)
     return df
 
-df_rt = reddit_trends_df(sql_con)
-df_mc = market_cap_df(sql_con)
-coin_list = list(df_mc['name'].sort_values().unique())
-df_red_agg = reddit_agg_by_day(sql_con)
-df_post = reddit_posts(sql_con) 
-df_scatter = mentions_marketcap()
-print("ran all sql")
+df_reddit_post = reddit_post_info()
+df_mc = market_cap_df()
+df_rt = reddit_trends_df()
+coin_list = list(df_mc['coin_name'].sort_values().unique())
+
 ## layout
 app.layout = html.Div([
     ## Top header Author, Title & submit Feedback Button
@@ -117,24 +84,10 @@ app.layout = html.Div([
                             {'label':i, 'value':i}
                             for i in coin_list
                         ],
-                        multi=True
+                        multi=True,
+                        value=['VeChain','Nano']
                     ),
-                ], className='five columns'
-            ),
-            html.Div(
-                [
-                    html.Div("Quick Coin Select",
-                        style={'text-align':'center'}),
-                    dcc.RadioItems(
-                        id='quick_filter',
-                        options=[
-                            {'label':'Top 5', 'value':5},
-                            {'label':'Top 10', 'value':10}
-                        ],
-                        labelStyle={'display':'inline-block'},
-                        style={'text-align':'center'}
-                    ),
-                ], className='two columns'
+                ], className='six columns'
             ),
             html.Div(
                 [
@@ -151,7 +104,7 @@ app.layout = html.Div([
                                     'text-align':'center'},
                         style={'text-align':'center'}
                     ),
-                ], className='two columns'
+                ], className='three columns'
             ),
             html.Div(
                 [                                       
@@ -212,13 +165,13 @@ app.layout = html.Div([
     ## Total MC chart & MC Percent Change 
     html.Div(
         [
-            html.Div(
-                [
-                    dcc.Graph(
-                        id='total_mc'
-                    ),
-                ], className='six columns',
-            ),
+            # html.Div(
+            #     [
+            #         dcc.Graph(
+            #             id='total_mc'
+            #         ),
+            #     ], className='six columns',
+            # ),
             html.Div(
                 [
                     dcc.Graph(
@@ -250,95 +203,80 @@ app.layout = html.Div([
         ], className="row", style={'marginTop': 5,'marginRight':15, 'marginLeft':15}
     )
 ], 
-    style={'backgroundColor':'#F1F1F1'}
+    #style={'backgroundColor':'#F1F1F1'}, 
+    className='ten columns offset-by-one'
 )
 
-## Callbacks
-
-@app.callback(
-    dash.dependencies.Output('coin_select', 'value'),
-    [dash.dependencies.Input('quick_filter', 'value')])
-def set_coin_select(qf_value):
-    if qf_value == None:
-        value = ['Nano', 'NEO', 'Walton','Ethereum','SALT','VeChain','Dent']
-    else:
-        value = df_mc[df_mc['current_rank'] <= qf_value]['name'].unique()
-    return value
-
+## Dynamically assigns Percent Change KPI
 @app.callback(
     dash.dependencies.Output('display_pct_change', 'children'),
     [dash.dependencies.Input('coin_select', 'value'),
     dash.dependencies.Input('date_filter', 'value')])
 def pct_change(coin_select, date_filter):
-    df = filter_df(df_mc, coin_select, date_filter)
-    print(coin_select)
+    df = filter_mc_df(df_mc, coin_select, date_filter)
     start = df[df['insert_timestamp'] == df.min()['insert_timestamp']].sum()['market_cap_usd']
     end = df[df['insert_timestamp'] == df.max()['insert_timestamp']].sum()['market_cap_usd']
     pct_change = round(((end-start)/start)*100)
     return ' {} % '.format(pct_change)
 
+## Dynamically count of Mentions KPI
 @app.callback(
     dash.dependencies.Output('reddit_mentions', 'children'),
     [dash.dependencies.Input('coin_select', 'value'),
     dash.dependencies.Input('date_filter', 'value')])
 def mentions(coin_select, date_filter):
-    df_reddit = filter_reddit(df_red_agg, coin_select, date_filter)
-    return df_reddit.sum()['num_posts']
+    df_reddit = filter_reddit(df_reddit_post, coin_select, date_filter)
+    return df_reddit.count()['post_id']
 
+## Dynamically shows Total Marketcap
 @app.callback(
     dash.dependencies.Output('display_total_mc', 'children'),
     [dash.dependencies.Input('coin_select', 'value')])
 def mc_total(coin_select):
     df = df_mc[df_mc['insert_timestamp'] == df_mc.max()['insert_timestamp']]
-    df_stg = df[df['name'].isin(coin_select)]
+    df_stg = df[df['coin_name'].isin(coin_select)]
     tmc = int(df_stg.sum()['market_cap_usd']/1000000)
     return '{:,} MM'.format(tmc)
 
+## Dynamically shows sentiment
 @app.callback(
     dash.dependencies.Output('sentiment_cnt', 'children'),
     [dash.dependencies.Input('coin_select', 'value'),
     dash.dependencies.Input('date_filter', 'value')])
 def mentions_by_sentiment(coin_select,date_filter):
-    df_reddit = filter_reddit(df_red_agg, coin_select, date_filter)
+    df_reddit = filter_reddit(df_reddit_post, coin_select, date_filter)
     df3 = df_reddit.groupby('sentiment', as_index=False).sum()
-    negative_cnt = int(df3[df3['sentiment'] =='Negative']['num_posts'])
-    positive_cnt = int(df3[df3['sentiment'] =='Positive']['num_posts'])
-    neutral_cnt = int(df3[df3['sentiment'] =='Neutral']['num_posts'])
+    negative_cnt = int(df3[df3['sentiment'] =='Negative']['post_id'])
+    positive_cnt = int(df3[df3['sentiment'] =='Positive']['post_id'])
+    neutral_cnt = int(df3[df3['sentiment'] =='Neutral']['post_id'])
     return 'Postive:{} Neutral: {} Negative: {}'.format(positive_cnt,neutral_cnt,negative_cnt)
 
-#total_MC_Graph
-@app.callback(
-    dash.dependencies.Output('total_mc', 'figure'),
-    [dash.dependencies.Input('coin_select', 'value'),
-    dash.dependencies.Input('date_filter', 'value')])
-def update_total_mc(coin_select, date_filter):
-    df_total_mc = filter_df(df_mc, coin_select, date_filter)
-    data = [{
-        'x':df_total_mc.groupby('insert_timestamp', as_index=False).agg('sum').sort_values('insert_timestamp')['insert_timestamp'],
-        'y':df_total_mc.groupby('insert_timestamp', as_index=False).agg('sum').sort_values('insert_timestamp')['market_cap_usd'],
-        'type': 'line',
-        'name': 'Total MC'}]
-    return {'data':data,
-            'layout':{
-                'title': 'Market Cap'}
-            }
+## Scatter plot of mentions vs marketcap by day
 @app.callback(
     dash.dependencies.Output('scatterpolot', 'figure'),
     [dash.dependencies.Input('coin_select', 'value'),
     dash.dependencies.Input('date_filter', 'value')])
 def scatter_plot(coin_select, datefilter):
-    df = filter_reddit(df_scatter, coin_select, datefilter)
+    df = filter_reddit(df_reddit_post, coin_select, datefilter)
+    df['created']= df['created'].dt.date
+    df = df.groupby(by=['created','coin_name'],as_index=False).count()[['coin_name','created','post_id']]
+    df2 = filter_mc_df(df_mc,coin_select, datefilter)
+    df2['insert_timestamp']=df2['insert_timestamp'].dt.date
+    df2 = df2.groupby(by=['coin_name','insert_timestamp'], as_index = False).mean()[['coin_name','insert_timestamp','market_cap_usd']]
+    df3 = pd.merge(df,df2,how='inner',left_on = ['coin_name','created'], right_on = ['coin_name','insert_timestamp'])[['coin_name','created','post_id','market_cap_usd']]
+    df3.head()
+    coin_list = list(df2['coin_name'].unique())
     data = [
         go.Scatter(
-            y=df[df['name'] == i]['post_count'],
-            x=df[df['name'] == i]['market_cap_usd'],
+            y=df3[df3['coin_name'] == i]['post_id'],
+            x=df3[df3['coin_name'] == i]['market_cap_usd'],
             opacity=0.8,
-            hovertext=df[df['name'] == i]['created'],
+            hovertext=df3[df3['coin_name'] == i]['created'],
             mode = 'markers',
             marker = dict(size = 15),
             name=i
 
-        ) for i in coin_select
+        ) for i in coin_list
     ]
     layout = go.Layout(
         title='Mentions vs Marketcap',
@@ -360,22 +298,40 @@ def scatter_plot(coin_select, datefilter):
     'layout':layout}
     return figure
 
+##Graph of percent change 
 @app.callback(
     dash.dependencies.Output('mc_by_coin', 'figure'),
     [dash.dependencies.Input('coin_select', 'value'),
     dash.dependencies.Input('date_filter', 'value')])
 def update_mc_by_coin(coin_select, date_filter):
-    df_coin_mc_stg = filter_df(df_mc, coin_select, date_filter)
-    df_coin_mc = df_coin_mc_stg.sort_values(by=['id','insert_timestamp'])
+    df_mc_stg = filter_mc_df(df_mc, coin_select, date_filter)
+    coin_list = list(df_mc_stg['coin_name'].unique())
+    frame = []
+    for i in coin_list:
+        df_stg_3 = df_mc_stg[df_mc_stg['coin_name'] == i]
+        base = df_stg_3[df_stg_3['insert_timestamp'] == df_stg_3.min()['insert_timestamp']]['market_cap_usd'].reset_index(drop=True)[0]
+        df_stg_3['pct_change'] = (((df_stg_3['market_cap_usd']-base)/ base) * 100 )
+        frame.append(df_stg_3)
+    df_stg_4 = pd.concat(frame)
+    df_stg_4 = df_stg_4.sort_values(by=['coin_name','insert_timestamp'])
     data = [
         go.Scatter(
-            x=df_coin_mc[df_coin_mc['name'] == i]['last_updated'],
-            y=df_coin_mc[df_coin_mc['name'] == i]['pct_change'],
+            x=df_stg_4[df_stg_4['coin_name'] == i]['last_updated'],
+            y=df_stg_4[df_stg_4['coin_name'] == i]['pct_change'],
             mode='line',
             opacity=0.8,
             name=i
         ) for i in coin_select
     ]
+    #df_avg_all = df_stg_4.group_by(by=['insert_timestamp'], as_index = False).mean()[['pct_change','insert_timestamp']]
+    # avg_all ={
+    #     'type': 'scatter',
+    #     'x': df_stg_4.group_by(by=['insert_timestamp'], as_index = False).mean()['insert_timestamp'],
+    #     'y': df_stg_4.group_by(by=['insert_timestamp'], as_index = False).mean()['pct_change'],
+    #     'mode':'line',
+    #     'name':'Average Percent'
+    # }
+
     layout = go.Layout(
         title='Market Cap % Change by Coin',
         yaxis=dict(
@@ -396,8 +352,6 @@ def update_mc_by_coin(coin_select, date_filter):
     return figure
 ##reddit agg graph
 
-
-
 #reddit post trends
 @app.callback(
     dash.dependencies.Output('tab-output', 'children'),
@@ -407,17 +361,15 @@ def update_mc_by_coin(coin_select, date_filter):
 def update_tabs(coin_select, date_filter,tabs):
     if tabs == 1: 
         df_2 = filter_reddit(df_rt, coin_select, date_filter)
-        df_trends = df_2.sort_values(['diff']).reset_index(drop=True)
+        df_trends = df_2.sort_values(['delta_minute']).reset_index(drop=True)
         posts = list(df_trends['post_id'].unique())
-        print(df_trends)
         data2 = [
             go.Scatter( 
-                x=df_trends[df_trends['post_id'] == i]['diff'],
+                x=df_trends[df_trends['post_id'] == i]['delta_minute'],
                 y=df_trends[df_trends['post_id'] == i]['score'],
                 mode='line',
                 opacity=0.8,
-                name=str(df_trends[df_trends['post_id'] == i]['name'].unique()[0]),
-                hovertext=str(df_trends[df_trends['post_id'] == i]['title'].unique()[0])
+                name=i
             ) for i in posts
         ]
         layout = go.Layout(
@@ -439,13 +391,13 @@ def update_tabs(coin_select, date_filter,tabs):
         )
         ])
     elif tabs == 2:
-        df_reddit = filter_reddit(df_red_agg, coin_select, date_filter)
-        df_reddit2 = df_reddit.groupby(by=['sentiment','name'],as_index=False).sum()
+        df_reddit = filter_reddit(df_reddit_post, coin_select, date_filter)
+        df_reddit2 = df_reddit.groupby(by=['sentiment','coin_name'],as_index=False).count()
         sentiment = ['Neutral','Negative','Positive']
         data = [
             go.Bar(
-                x = df_reddit2[df_reddit2['sentiment'] == i]['name'],
-                y = df_reddit2[df_reddit2['sentiment'] == i]['num_posts'],
+                x = df_reddit2[df_reddit2['sentiment'] == i]['coin_name'],
+                y = df_reddit2[df_reddit2['sentiment'] == i]['post_id'],
                 name = i
             ) for i in sentiment 
         ]
@@ -462,12 +414,13 @@ def update_tabs(coin_select, date_filter,tabs):
             figure = figure1)])
 
     elif tabs ==3:
-        df_reddit = filter_reddit(df_red_agg, coin_select, date_filter)
-        df_reddit2 = df_reddit.groupby(by=['created','name'],as_index=False).sum()
+        df_reddit = filter_reddit(df_reddit_post, coin_select, date_filter)
+        df_reddit['created']=df_reddit['created'].dt.date
+        df_reddit2 = df_reddit.groupby(by=['created','coin_name'],as_index=False).count()
         data = [
             go.Bar(
-                x=df_reddit2[df_reddit2['name'] == i]['created'],
-                y=df_reddit2[df_reddit2['name'] == i]['num_posts'],
+                x=df_reddit2[df_reddit2['coin_name'] == i]['created'],
+                y=df_reddit2[df_reddit2['coin_name'] == i]['post_id'],
                 name = i#,
                 #hovertext=df_reddit[df_reddit['name'] == i]['sentiment']
             ) for i in coin_select
@@ -484,28 +437,21 @@ def update_tabs(coin_select, date_filter,tabs):
             dcc.Graph(id='graph',
             figure = figure1)])
 
-
-
 #helper function for price data
-def filter_df(df=None, coin_select=None, date_filter=None):
+def filter_mc_df(df=None, coin_select=None, date_filter=None):
     date_cutoff = df.max()['insert_timestamp'] - pd.Timedelta(days=date_filter)
     #coin_filter
-    df_stg = df[df['name'].isin(coin_select)]
+    df_stg = df[df['coin_name'].isin(coin_select)]
     #date_filter
     df_stg_2 = df_stg[df_stg['insert_timestamp'] >= date_cutoff]
-    coin_list = list(df_stg_2['name'].unique())
-    frame = []
-    for i in coin_list:
-        df_stg_3 = df_stg_2[df_stg_2['name']== i]
-        base = df_stg_3[df_stg_3['insert_timestamp'] == df_stg_3.min()['insert_timestamp']]['market_cap_usd'].reset_index(drop=True)[0]
-        df_stg_3['pct_change'] = (((df_stg_3['market_cap_usd']-base)/ base) * 100 )
-        frame.append(df_stg_3)
-    df_stg_4 = pd.concat(frame)
-    return df_stg_4
-
+    return df_stg_2
 
 def filter_reddit(df=None, coin_select=None, date_filter=None):
-    df_stg = df[df['name'].isin(coin_select)]
+    if 'coin_name' in df.columns:
+        df_stg = df[df['coin_name'].isin(coin_select)]
+    else:
+        df_stg = df
+        print('no coin filter')
     date_cutoff = df.max()['created'] - pd.Timedelta(days=date_filter)
     df_stg_2 = df_stg[df_stg['created'] >= date_cutoff]
     return df_stg_2
