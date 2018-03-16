@@ -37,9 +37,9 @@ def mentions_marketcap(pg_conn = sql_con):
 def market_cap_df(pg_conn=sql_con):
     """Returns the dataframe used for marketcap graphs"""
     sql = """
-    select id, name, current_rank, last_updated,insert_timestamp, market_cap_usd
+    select name, last_updated,insert_timestamp, market_cap_usd
     From coin.mc_graph_data 
-    group by 1,2,3,4,5,6
+    group by 1,2,3,4
         """
     df = pd.read_sql(sql, pg_conn)
     return df
@@ -366,7 +366,7 @@ def scatter_plot(coin_select, datefilter):
     dash.dependencies.Input('date_filter', 'value')])
 def update_mc_by_coin(coin_select, date_filter):
     df_coin_mc_stg = filter_df(df_mc, coin_select, date_filter)
-    df_coin_mc = df_coin_mc_stg.sort_values(by=['id','insert_timestamp'])
+    df_coin_mc = df_coin_mc_stg.sort_values(by=['name','insert_timestamp'])
     data = [
         go.Scatter(
             x=df_coin_mc[df_coin_mc['name'] == i]['last_updated'],
