@@ -33,9 +33,10 @@ def reddit_post_info(pg_conn = sql_con):
 def market_cap_df(pg_conn=sql_con):
     """Returns the dataframe used for marketcap graphs"""
     sql = """
-    select name as coin_name, last_updated, insert_timestamp, market_cap_usd
-    From coin.mc_graph_data 
-    group by 1,2,3,4
+    Select a.name as coin_name,market_cap_usd, insert_timestamp, ((market_cap_usd - base_7day)/base_7day)* 100 as pct_change_7d,((market_cap_usd-base_24H)/base_24H)* 100 as pct_change_L24H   
+    from  coin.mc_graph_data a
+    inner join coin.pct_change_base b
+    on a.name= b.name
     """
     df = pd.read_sql(sql, pg_conn)
     return df
@@ -49,17 +50,18 @@ def reddit_trends_df(pg_conn=sql_con):
     return df
 
 df_reddit_post = reddit_post_info()
-df_mc = market_cap_df()
+df_mc_pct = market_cap_df()
 df_rt = reddit_trends_df()
-coin_list = list(df_mc['coin_name'].sort_values().unique())
-frame=[]
-for i in coin_list:
-    df_stg_3 = df_mc[df_mc['coin_name'] == i]
-    base = df_stg_3[df_stg_3['insert_timestamp'] == df_stg_3.min()['insert_timestamp']]['market_cap_usd'].reset_index(drop=True)[0]
-    df_stg_3['pct_change'] = (((df_stg_3['market_cap_usd']-base)/ base) * 100 )
-    frame.append(df_stg_3)
+coin_list = list(df_mc_pct['coin_name'].sort_values().unique())
+colors = ['#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd','#8c564b','#e377c2','#7f7f7f','#bcbd22','#17becf'] * 10
+# frame=[]
+# for i in coin_list:
+#     df_stg_3 = df_mc[df_mc['coin_name'] == i]
+#     base = df_stg_3[df_stg_3['insert_timestamp'] == df_stg_3.min()['insert_timestamp']]['market_cap_usd'].reset_index(drop=True)[0]
+#     df_stg_3['pct_change'] = (((df_stg_3['market_cap_usd']-base)/ base) * 100 )
+#     frame.append(df_stg_3)
 
-df_mc_pct = pd.concat(frame)
+#df_mc_pct = pd.concat(frame)
 
 ## layout
 app.layout = html.Div([
@@ -93,7 +95,7 @@ app.layout = html.Div([
                             for i in coin_list
                         ],
                         multi=True,
-                        value=['VeChain','Nano']
+                        value=['VeChain','NEM']
                     ),
                 ], className='six columns'
             ),
@@ -140,6 +142,14 @@ app.layout = html.Div([
                 ),
             html.Div(
                 [
+                    html.Div(children="Mentions by Sentiment",
+                    style={'textAlign':'center','fontSize':20}),
+                    html.Div(id='sentiment_cnt',
+                    style={'textAlign':'center'})
+                ], className = 'four columns'
+                ),
+            html.Div(
+                [
                     html.Div(children="Mentions",
                     style={'textAlign':'center','fontSize':20}),
                     html.Div(id='reddit_mentions',
@@ -147,59 +157,43 @@ app.layout = html.Div([
                         })
                 ], className = 'four columns'
                 ),
-            html.Div(
-                [
-                    html.Div(children="Mentions by Sentiment",
-                    style={'textAlign':'center','fontSize':20}),
-                    html.Div(id='sentiment_cnt',
-                    style={'textAlign':'center'})
-                ], className = 'four columns'
-                ),
+
         ], className="row",style={'marginTop': 5}
     ),
 
     ## Total MC chart & MC Percent Change 
     html.Div(
         [
-            html.Div([html.Div()],
-                className='two columns'
-            ),
             html.Div(
                 [
                     dcc.Graph(
-                        id='mc_by_coin',
-                        style={'float':'right'}
+                        id='mc_by_coin'
+                        
                     ),
-                ], className='eight columns'
+                ], 
             ),
-            html.Div(
-                className='two columns'
-            )
-        ], className="row", style={'marginTop': 5,'marginRight':15, 'marginLeft':15, 'float':'middle'}
+        ], className="row", style={'marginTop': 5,'marginRight':15, 'marginLeft':15}
     ),
     html.Div(
         [
-            html.Div(
-                [   dcc.Tabs(
-                        tabs=[
-                            {'label': 'Reddit Post Trends', 'value': 1},
-                            {'label': 'Sentiment by Coin', 'value': 2},
-                            {'label': 'Mentions by Day', 'value': 3}
-                        ],
-                        value = 2,
-                        id='tabs',
-                    ),
-                    html.Div(id='tab-output')
-                    ], className='six columns'
+            html.Div(children="The chart above shows the percent change of the selected coins market cap overlayed with news posted",
+            style = {'float':'middle'},
+            className="twelve columns")
+    ],className="row"),
+    html.Div(
+        [
+            html.Div([
+                html.Div(id='reddit_post_trends')
+                ], className='six columns'
             ),
-            html.Div(
-                [dcc.Graph(id = 'scatterpolot'), 
-                    ], className='six columns'
-            ),
+            html.Div([
+                html.Div(id = 'reddit_sentiment_info'),
+                ], className='six columns'),
+            
         ], className="row", style={'marginTop': 5,'marginRight':15, 'marginLeft':15}
-    )
-], 
-    #style={'backgroundColor':'#F1F1F1'}, 
+    ), 
+    
+],  
     className='ten columns offset-by-one'
 )
 
@@ -235,53 +229,8 @@ def mentions_by_sentiment(coin_select,date_filter):
     negative_cnt = int(df3[df3['sentiment'] =='Negative']['post_id'])
     positive_cnt = int(df3[df3['sentiment'] =='Positive']['post_id'])
     neutral_cnt = int(df3[df3['sentiment'] =='Neutral']['post_id'])
-    return 'Postive:{} Neutral: {} Negative: {}'.format(positive_cnt,neutral_cnt,negative_cnt)
+    return 'Postive:{} | Neutral: {} | Negative: {}'.format(positive_cnt,neutral_cnt,negative_cnt)
 
-## Scatter plot of mentions vs marketcap by day
-@app.callback(
-    dash.dependencies.Output('scatterpolot', 'figure'),
-    [dash.dependencies.Input('coin_select', 'value'),
-    dash.dependencies.Input('date_filter', 'value')])
-def scatter_plot(coin_select, datefilter):
-    df = filter_reddit(df_reddit_post, coin_select, datefilter)
-    df['created']= df['created'].dt.date
-    df = df.groupby(by=['created','coin_name'],as_index=False).count()[['coin_name','created','post_id']]
-    df2 = filter_mc_df(df_mc_pct,coin_select, datefilter)
-    df2['insert_timestamp']=df2['insert_timestamp'].dt.date
-    df2 = df2.groupby(by=['coin_name','insert_timestamp'], as_index = False).mean()[['coin_name','insert_timestamp','market_cap_usd']]
-    df3 = pd.merge(df,df2,how='inner',left_on = ['coin_name','created'], right_on = ['coin_name','insert_timestamp'])[['coin_name','created','post_id','market_cap_usd']]
-    df3.head()
-    data = [
-        go.Scatter(
-            y=df3[df3['coin_name'] == i]['post_id'],
-            x=df3[df3['coin_name'] == i]['market_cap_usd'],
-            opacity=0.8,
-            hovertext=df3[df3['coin_name'] == i]['created'],
-            mode = 'markers',
-            marker = dict(size = 15),
-            name=i
-
-        ) for i in coin_select
-    ]
-    layout = go.Layout(
-        title='Mentions vs Marketcap',
-        xaxis=dict(
-             title='Marketcap (Log Scale)',
-             
-        type='log',
-        autorange=True,
-        
-    ),
-    hovermode='closest',
-    yaxis=dict(
-        title='Mention Count',
-        
-        autorange=True
-    )
-    )
-    figure = {'data':data,
-    'layout':layout}
-    return figure
 
 ##Graph of percent change 
 @app.callback(
@@ -289,18 +238,28 @@ def scatter_plot(coin_select, datefilter):
     [dash.dependencies.Input('coin_select', 'value'),
     dash.dependencies.Input('date_filter', 'value')])
 def update_mc_by_coin(coin_select, date_filter):
-    df_mc_stg = filter_mc_df(df_mc_pct, None, date_filter)
+    
+    df_mc_stg = filter_mc_df(df_mc_pct, coin_select, date_filter)
+    print(type(date_filter))
+    if date_filter == 1:
+        df_mc_stg.rename(columns={"pct_change_l24h":"pct_change"},inplace=True)
+    elif date_filter == 7:
+        df_mc_stg.rename(columns={"pct_change_7d":"pct_change"},inplace=True)
+    print(df_mc_stg.columns)
     df_stg_4 = df_mc_stg.sort_values(by=['coin_name','insert_timestamp'])
+    
     data = [
         go.Scatter(
-            x=df_stg_4[df_stg_4['coin_name'] == i]['last_updated'],
+            x=df_stg_4[df_stg_4['coin_name'] == i]['insert_timestamp'],
             y=df_stg_4[df_stg_4['coin_name'] == i]['pct_change'],
             mode='line',
+            line = dict(color=colors[idx]),
+            hovertext=False,
             opacity=0.8,
             name=i
-        ) for i in coin_select
+        ) for idx, i in enumerate(coin_select)
     ]
-    #calculate average of topp 100
+    #calculate average of top 100
     df_all_stg = df_stg_4.groupby(['insert_timestamp'], as_index=False).mean()[['insert_timestamp','pct_change']]
     all_trace = go.Scatter(
         x=df_all_stg['insert_timestamp'],
@@ -320,12 +279,12 @@ def update_mc_by_coin(coin_select, date_filter):
         go.Scatter(
             x=df3[df3['coin_name'] == i]['created'],
             y=df3[df3['coin_name'] == i]['score'],
-            name = i,
+            name = i,#df3[df3['coin_name'] == i]['post_id'],
             mode='markers',
+            marker=dict(symbol=2,size =15 ,color=colors[idx]),
             yaxis='y2',
-            hovertext=df3[df3['coin_name'] == i]['title'],
-            marker = dict(size = 8)
-        ) for i in coin_select
+            customdata=df3[df3['coin_name'] == i]['post_id']
+        ) for idx, i in enumerate(coin_select)
     ]
     data3 = data + data2
 
@@ -335,9 +294,10 @@ def update_mc_by_coin(coin_select, date_filter):
             title='Percent Change',  
             showgrid=False   
         ),
-        yaxis2=dict(title='Score',side='right',overlaying='y',type='log'),
+        yaxis2=dict(title='Score',side='right',overlaying='y',showgrid=False, type='log'),
         legend=dict(
-        traceorder='reversed'
+        #traceorder='reversed', 
+        orientation = 'h'
     ),
         hovermode='closest',
         margin=dict(
@@ -347,105 +307,182 @@ def update_mc_by_coin(coin_select, date_filter):
             b=50,
             pad=10
         ),
-        xaxis=dict(showgrid=False )
+        xaxis=dict(showgrid=False ),
+        height=350
     )
     figure = {'data':data3,
     'layout':layout}
     return figure
-##reddit agg graph
+
+@app.callback(
+    dash.dependencies.Output('reddit_sentiment_info', 'children'),
+    [dash.dependencies.Input('coin_select', 'value'),
+     dash.dependencies.Input('date_filter', 'value'),
+     dash.dependencies.Input('mc_by_coin','hoverData')])
+def create_post_info(coin_select,date_filter,main_graph_hover):
+    df_2 = filter_reddit(df_rt, coin_select, date_filter)
+    df_reddit = filter_reddit(df_reddit_post, coin_select, date_filter)
+    df_stg = pd.merge(left=df_2,right=df_reddit,how='inner',left_on='post_id',right_on='post_id')
+    if main_graph_hover is None:
+        customdata=df_stg.max()['post_id']
+        main_graph_hover = {'points': [
+            {'curveNumber': 3, 'pointNumber': 1, 'pointIndex': 1, 'x': '2018-03-14 14:06:13', 'y': 137, 'customdata':customdata }]}
+    post = main_graph_hover['points'][0]['customdata']
+    title = str(df_reddit[df_reddit['post_id']==post]['title'].unique()[0])
+    sentiment = str(df_reddit[df_reddit['post_id']==post]['sentiment'].unique()[0])
+    if sentiment == 'Negative':
+        path = 'M 0.24 0.5 L 0.14 0.64 L 0.24 0.5 Z'
+    elif sentiment == 'Positive':
+        path = 'M 0.24 0.5 L 0.34 0.64 L 0.24 0.5 Z'
+    else:
+        path = 'M 0.24 0.5 L 0.24 0.75 L 0.24 0.5 Z'
+    confidence = int(df_reddit[df_reddit['post_id']==post]['confidence'].unique()[0])
+    text = """ {}  | Sentiment: {}  |  confidence {}  
+        """.format(title,sentiment,confidence)
+
+    base_chart = {
+    "values": [40, 20, 20, 20],
+    "domain": {"x": [0, .48]},
+    "marker": {
+        "colors": [
+            'rgb(255, 255, 255)',
+            'rgb(255, 255, 255)',
+            'rgb(255, 255, 255)',
+            'rgb(255, 255, 255)'
+        ],
+        "line": {
+            "width": 1
+        }
+    },
+    "name": "Gauge",
+    "hole": .4,
+    "type": "pie",
+    "direction": "clockwise",
+    "rotation": 108,
+    "showlegend": False,
+    "hoverinfo": "none"
+    }
+    meter_chart = {
+        "values": [50, 16.68, 16.67, 16.5],
+        "labels": [" ", "Negative", "Neutral", "Postive"],
+        "marker": {
+            'colors': [
+                '#FDFEFE',
+                '#FF3333',
+                '#D7DBDD',
+                '#33CC66',
+            ]
+        },
+        "domain": {"x": [0, 0.48]},
+        "name": "Gauge",
+        "hole": .3,
+        "type": "pie",
+        "direction": "clockwise",
+        "rotation": 90,
+        "showlegend": False,
+        "textinfo": "label",
+        "textposition": "inside",
+        "hoverinfo": "none"
+        }
+
+    layout = {
+        'xaxis': {
+            'showticklabels': False,
+            'autotick': False,
+            'showgrid': False,
+            'zeroline': False,
+        },
+        'yaxis': {
+            'showticklabels': False,
+            'autotick': False,
+            'showgrid': False,
+            'zeroline': False,
+        },
+        'shapes': [
+            {
+                'type': 'path',
+                'path': path,
+                'fillcolor': 'rgba(44, 160, 101, 0.5)',
+                'line': {
+                    'width': 3
+                },
+                'xref': 'paper',
+                'yref': 'paper'
+            }
+        ],
+        'annotations': [
+            {
+                'xref': 'paper',
+                'yref': 'paper',
+                'x': 0.15,
+                'y': 0.45,
+                'text': 'Sentiment Prediction',
+                'showarrow': False
+            }
+        ]
+    }
+    base_chart['marker']['line']['width'] = 0
+    return html.Div(
+            [html.Div(text),
+            dcc.Graph(id = 'graph',figure = {"data": [base_chart, meter_chart],
+                    "layout": layout}),
+        ]
+        )
 
 #reddit post trends
 @app.callback(
-    dash.dependencies.Output('tab-output', 'children'),
+    dash.dependencies.Output('reddit_post_trends', 'children'),
     [dash.dependencies.Input('coin_select', 'value'),
      dash.dependencies.Input('date_filter', 'value'),
-     dash.dependencies.Input('tabs','value')])
-def update_tabs(coin_select, date_filter,tabs):
-    if tabs == 1: 
-        df_2 = filter_reddit(df_rt, coin_select, date_filter)
-        df_trends = df_2.sort_values(['delta_minute']).reset_index(drop=True)
-        posts = list(df_trends['post_id'].unique())
-        data2 = [
-            go.Scatter( 
-                x=df_trends[df_trends['post_id'] == i]['delta_minute'],
-                y=df_trends[df_trends['post_id'] == i]['score'],
-                mode='line',
-                opacity=0.8,
-                name=i
-            ) for i in posts
-        ]
-        layout = go.Layout(
-            title='Reddit Post Trends',
-            yaxis=dict(
-                title='Score'
-            ),
-            hovermode='closest',
-            showlegend=False
+     dash.dependencies.Input('mc_by_coin','hoverData')])
+def update_tabs(coin_select, date_filter,main_graph_hover):
+    df_2 = filter_reddit(df_rt, coin_select, date_filter)
+    df_reddit = filter_reddit(df_reddit_post, coin_select, date_filter)
+    df_stg = pd.merge(left=df_2,right=df_reddit,how='inner',left_on='post_id',right_on='post_id')
+    df_trends = df_stg.sort_values(['delta_minute']).reset_index(drop=True)
+    if main_graph_hover is None:
+        customdata=df_trends.max()['post_id']
+        print(customdata)
+        main_graph_hover = {'points': [
+            {'curveNumber': 3, 'pointNumber': 1, 'pointIndex': 1, 'x': '2018-03-14 14:06:13', 'y': 137, 'customdata':customdata }]}
+    posts = main_graph_hover['points'][0]['customdata']       
+    data2 = [
+        go.Scatter( 
+        x=df_trends[df_trends['post_id'] == posts]['delta_minute'],
+        y=df_trends[df_trends['post_id'] == posts]['score'],
+        mode='line',
+        opacity=0.8,
+        line =dict(color='#000000'),
+        hovertext=df_trends[df_trends['post_id'] == posts]['coin_name'] 
+        )]
+    layout = go.Layout(
+        title='Reddit Post Trends',
+        yaxis=dict(
+            title='Score'
+        ),
+        hovermode='closest',
+        showlegend=False
         )
-        figure1 = {
+    figure1 = {
         'data':data2,
         'layout':layout
         }
-        return html.Div([
+    return html.Div([
             dcc.Graph(
-            id='graph',
+            id='graph12',
             figure=figure1
         )
         ])
-    elif tabs == 2:
-        df_reddit = filter_reddit(df_reddit_post, coin_select, date_filter)
-        df_reddit2 = df_reddit.groupby(by=['sentiment','coin_name'],as_index=False).count()
-        sentiment = ['Neutral','Negative','Positive']
-        data = [
-            go.Bar(
-                x = df_reddit2[df_reddit2['sentiment'] == i]['coin_name'],
-                y = df_reddit2[df_reddit2['sentiment'] == i]['post_id'],
-                name = i
-            ) for i in sentiment 
-        ]
-        layout = go.Layout(
-            title='Sentiment By Coin',
-            yaxis=dict(
-                title='Mention Count'
-            )
-        )
-        figure1={'data':data,
-            'layout':layout}
-        return html.Div([
-            dcc.Graph(id='graph',
-            figure = figure1)])
 
-    elif tabs ==3:
-        df_reddit = filter_reddit(df_reddit_post, coin_select, date_filter)
-        df_2 = filter_reddit(df_rt, coin_select, date_filter)
-        df_2 = df_2.groupby(by=['post_id'],as_index = False).max()[['post_id','score']]
-        df3 = pd.merge(left=df_reddit, right=df_2, on='post_id',how='inner',)
+ 
+    
 
-        data = [
-            go.Scatter(
-                x=df3[df3['coin_name'] == i]['created'],
-                y=df3[df3['coin_name'] == i]['score'],
-                name = i,
-                mode='markers',
-                hovertext=df3[df3['coin_name'] == i]['title'],
-                marker = dict(size = 8)
-            ) for i in coin_select
-        ]
-        layout = go.Layout(
-            title='Mentions per Day',
-            yaxis=dict(title='Mention Count'),
-            hovermode='closest'
-            )
-        figure1={'data':data,
-            'layout':layout}
-        return html.Div([
-            dcc.Graph(id='graph',
-            figure = figure1)])
 
 #helper function for price data
 def filter_mc_df(df=None, coin_select=None, date_filter=None):
     date_cutoff = df.max()['insert_timestamp'] - pd.Timedelta(days=date_filter)
     #coin_filter
+    print(type(coin_select))
     if coin_select != None:
         df_stg = df[df['coin_name'].isin(coin_select)]
     #date_filter
@@ -466,3 +503,72 @@ def filter_reddit(df=None, coin_select=None, date_filter=None):
 
 if __name__ == '__main__':
     app.run_server(debug=True)
+
+    # elif tabs == 2:
+    #     df_reddit = filter_reddit(df_reddit_post, coin_select, date_filter)
+    #     df_reddit2 = df_reddit.groupby(by=['sentiment','coin_name'],as_index=False).count()
+    #     sentiment = ['Neutral','Negative','Positive']
+    #     data = [
+    #         go.Bar(
+    #             x = df_reddit2[df_reddit2['sentiment'] == i]['coin_name'],
+    #             y = df_reddit2[df_reddit2['sentiment'] == i]['post_id'],
+    #             name = i
+    #         ) for i in sentiment 
+    #     ]
+    #     layout = go.Layout(
+    #         title='Sentiment By Coin',
+    #         yaxis=dict(
+    #             title='Mention Count'
+    #         )
+    #     )
+    #     figure1={'data':data,
+    #         'layout':layout}
+    #     return html.Div([
+    #         dcc.Graph(id='graph',
+    #         figure = figure1)])
+
+    ## Scatter plot of mentions vs marketcap by day
+# @app.callback(
+#     dash.dependencies.Output('scatterpolot', 'figure'),
+#     [dash.dependencies.Input('coin_select', 'value'),
+#     dash.dependencies.Input('date_filter', 'value')])
+# def scatter_plot(coin_select, datefilter):
+#     df = filter_reddit(df_reddit_post, coin_select, datefilter)
+#     df['created']= df['created'].dt.date
+#     df = df.groupby(by=['created','coin_name'],as_index=False).count()[['coin_name','created','post_id']]
+#     df2 = filter_mc_df(df_mc_pct,coin_select, datefilter)
+#     df2['insert_timestamp']=df2['insert_timestamp'].dt.date
+#     df2 = df2.groupby(by=['coin_name','insert_timestamp'], as_index = False).mean()[['coin_name','insert_timestamp','market_cap_usd']]
+#     df3 = pd.merge(df,df2,how='inner',left_on = ['coin_name','created'], right_on = ['coin_name','insert_timestamp'])[['coin_name','created','post_id','market_cap_usd']]
+#     df3.head()
+#     data = [
+#         go.Scatter(
+#             y=df3[df3['coin_name'] == i]['post_id'],
+#             x=df3[df3['coin_name'] == i]['market_cap_usd'],
+#             opacity=0.8,
+#             hovertext=df3[df3['coin_name'] == i]['created'],
+#             mode = 'markers',
+#             marker = dict(size = 15),
+#             name=i
+
+#         ) for i in coin_select
+#     ]
+#     layout = go.Layout(
+#         title='Mentions vs Marketcap',
+#         xaxis=dict(
+#              title='Marketcap (Log Scale)',
+             
+#         type='log',
+#         autorange=True,
+        
+#     ),
+#     hovermode='closest',
+#     yaxis=dict(
+#         title='Mention Count',
+        
+#         autorange=True
+#     )
+#     )
+#     figure = {'data':data,
+#     'layout':layout}
+#     return figure
