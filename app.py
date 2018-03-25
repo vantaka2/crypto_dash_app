@@ -13,7 +13,6 @@ server = app.server
 app.css.append_css(
     {'external_url':'https://cdn.rawgit.com/plotly/dash-app-stylesheets/2d266c578d2a6e8850ebce48fdb52759b2aef506/stylesheet-oil-and-gas.css'})
 sql_con = os.environ.get('pg_db')
-print("set sql_con")
 
 def reddit_post_info(pg_conn = sql_con):
     sql = """
@@ -55,8 +54,8 @@ df_rt = reddit_trends_df()
 coin_list = list(df_mc_pct['coin_name'].sort_values().unique())
 colors = ['#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd','#8c564b','#e377c2','#7f7f7f','#bcbd22','#17becf'] * 10
 frame=[]
-df2 = df_mc_pct.groupby(['insert_timestamp'],as_index=False).mean()
-df2['coin_name']="Top 100"
+df_mc_avg = df_mc_pct.groupby(['insert_timestamp'],as_index=False).mean()
+df_mc_avg['coin_name']="AVG of Top 100"
 
 ## layout
 app.layout = html.Div([
@@ -199,10 +198,12 @@ app.layout = html.Div([
     [dash.dependencies.Input('coin_select', 'value'),
     dash.dependencies.Input('date_filter', 'value')])
 def pct_change(coin_select, date_filter):
+    print("Start 1")
     df = filter_mc_df(df_mc_pct, coin_select, date_filter)
     start = df[df['insert_timestamp'] == df.min()['insert_timestamp']].sum()['market_cap_usd']
     end = df[df['insert_timestamp'] == df.max()['insert_timestamp']].sum()['market_cap_usd']
     pct_change = round(((end-start)/start)*100)
+    print("END 1")
     return ' {} % '.format(pct_change)
 
 ## Dynamically count of Mentions KPI
@@ -211,7 +212,9 @@ def pct_change(coin_select, date_filter):
     [dash.dependencies.Input('coin_select', 'value'),
     dash.dependencies.Input('date_filter', 'value')])
 def mentions(coin_select, date_filter):
+    print("Start 2")
     df_reddit = filter_reddit(df_reddit_post, coin_select, date_filter)
+    print("End 2")
     return df_reddit.count()['post_id']
 
 ## Dynamically shows sentiment
@@ -220,16 +223,19 @@ def mentions(coin_select, date_filter):
     [dash.dependencies.Input('coin_select', 'value'),
     dash.dependencies.Input('date_filter', 'value')])
 def mentions_by_sentiment(coin_select,date_filter):
+    print("Start 3")
     df_reddit = filter_reddit(df_reddit_post, coin_select, date_filter)
+    positive_cnt = 0
+    negative_cnt = 0
+    neutral_cnt = 0
     df3 = df_reddit.groupby('sentiment', as_index=False).count()
-    if 'Postive' in df3['sentiment']:
+    if 'Positive' in df3['sentiment'].unique():
         positive_cnt = int(df3[df3['sentiment'] =='Positive']['post_id'])
-    else:
-        positive_cnt = 0
-
-    negative_cnt = int(df3[df3['sentiment'] =='Negative']['post_id'])
-    
-    neutral_cnt = int(df3[df3['sentiment'] =='Neutral']['post_id'])
+    if 'Negative' in df3['sentiment'].unique():
+        negative_cnt = int(df3[df3['sentiment'] =='Negative']['post_id'])
+    if 'Neutral' in df3['sentiment'].unique():
+        neutral_cnt = int(df3[df3['sentiment'] =='Neutral']['post_id'])
+    print("End 3")
     return 'Postive:{} | Neutral: {} | Negative: {}'.format(positive_cnt,neutral_cnt,negative_cnt)
 
 
@@ -239,13 +245,17 @@ def mentions_by_sentiment(coin_select,date_filter):
     [dash.dependencies.Input('coin_select', 'value'),
     dash.dependencies.Input('date_filter', 'value')])
 def update_mc_by_coin(coin_select, date_filter):
+    coin_select.append("AVG of Top 100")
+    print(coin_select)
     df_mc_stg = filter_mc_df(df_mc_pct, coin_select, date_filter)
+    print(df_mc_stg['coin_name'].unique())
+    df_mc_avg_stg = df_mc_avg
     if date_filter == 1:
         df_mc_stg.rename(columns={"pct_change_l24h":"pct_change"},inplace=True)
-        df2.rename(columns={"pct_change_l24h":"pct_change"},inplace=True)
+        df_mc_avg_stg.rename(columns={"pct_change_l24h":"pct_change"},inplace=True)
     elif date_filter == 7:
         df_mc_stg.rename(columns={"pct_change_7d":"pct_change"},inplace=True)
-        df2.rename(columns={"pct_change_7d":"pct_change"},inplace=True)
+        df_mc_avg_stg.rename(columns={"pct_change_7d":"pct_change"},inplace=True)
     df_stg_4 = df_mc_stg.sort_values(by=['coin_name','insert_timestamp'])    
     data = [
         go.Scatter(
@@ -258,45 +268,39 @@ def update_mc_by_coin(coin_select, date_filter):
             name=i
         ) for idx, i in enumerate(coin_select)
     ]
-    #calculate average of top 100
-    all_trace = go.Scatter(
-        x=df2['insert_timestamp'],
-        y=df2['pct_change'],
-        mode='line',
-        line=dict(dash='dot',width=6,color='#7E909A'),
-        name='Top 100 Avg'
-    )
-    data.append(all_trace)
-    #############
+    # all_trace = [go.Scatter(
+    #     x=df_mc_avg_stg['insert_timestamp'],
+    #     y=df_mc_avg_stg['pct_change'],
+    #     mode='line',
+    #     line=dict(dash='dot',width=6,color='#7E909A'),
+    #     name='Top 100 Avg')]
+    data #.append(all_trace) #+ all_trace
     df_reddit = filter_reddit(df_reddit_post, coin_select, date_filter)
-    df_2 = filter_reddit(df_rt, coin_select, date_filter)
-    df_2 = df_2.groupby(by=['post_id'],as_index = False).max()[['post_id','score']]
-    df3 = pd.merge(left=df_reddit, right=df_2, on='post_id',how='inner',)
-
-    data2 = [
-        go.Scatter(
-            x=df3[df3['coin_name'] == i]['created'],
-            y=df3[df3['coin_name'] == i]['score'],
-            name = i,#df3[df3['coin_name'] == i]['post_id'],
-            mode='markers',
-            marker=dict(symbol=2,size =15 ,color=colors[idx]),
-            yaxis='y2',
-            customdata=df3[df3['coin_name'] == i]['post_id']
-        ) for idx, i in enumerate(coin_select)
-    ]
-    data3 = data + data2
-
+    if len(df_reddit)>0:
+        df_2 = filter_reddit(df_rt, coin_select, date_filter)
+        df_2 = df_2.groupby(by=['post_id'],as_index = False).max()[['post_id','score']]
+        df3 = pd.merge(left=df_reddit, right=df_2, on='post_id',how='inner')
+        data2 = [
+            go.Scatter(
+                x=df3[df3['coin_name'] == i]['created'],
+                y=df3[df3['coin_name'] == i]['score'],
+                name = i,
+                mode='markers',
+                marker=dict(symbol=2,size =15 ,color=colors[idx]),
+                yaxis='y2',
+                customdata=df3[df3['coin_name'] == i]['post_id']
+            ) for idx, i in enumerate(coin_select)]
+        data3 = data + data2
+    else:
+        data3 = data_stg_2
     layout = go.Layout(
         title='Market Cap % Change by Coin',
         yaxis=dict(
             title='Percent Change',  
             showgrid=False   
         ),
-        yaxis2=dict(title='Score',side='right',overlaying='y',showgrid=False, type='log'),
         legend=dict(
-        #traceorder='reversed', 
-        orientation = 'h'
-    ),
+        orientation = 'h'),
         hovermode='closest',
         margin=dict(
             l=50,
@@ -308,8 +312,11 @@ def update_mc_by_coin(coin_select, date_filter):
         xaxis=dict(showgrid=False ),
         height=350
     )
+    if len(df_reddit) >0:
+        layout['yaxis2']=dict(title='Score',side='right',overlaying='y',showgrid=False, type='log')
     figure = {'data':data3,
     'layout':layout}
+    print("End 4")
     return figure
 
 @app.callback(
@@ -318,27 +325,31 @@ def update_mc_by_coin(coin_select, date_filter):
      dash.dependencies.Input('date_filter', 'value'),
      dash.dependencies.Input('mc_by_coin','hoverData')])
 def create_post_info(coin_select,date_filter,main_graph_hover):
+    print("start 5")
     df_2 = filter_reddit(df_rt, coin_select, date_filter)
     df_reddit = filter_reddit(df_reddit_post, coin_select, date_filter)
     df_stg = pd.merge(left=df_2,right=df_reddit,how='inner',left_on='post_id',right_on='post_id')
-    if main_graph_hover is None:
+    if main_graph_hover is None and len(df_stg)>0:
         customdata=df_stg.max()['post_id']
         main_graph_hover = {'points': [
             {'curveNumber': 3, 'pointNumber': 1, 'pointIndex': 1, 'x': '2018-03-14 14:06:13', 'y': 137, 'customdata':customdata }]}
-    post = main_graph_hover['points'][0]['customdata']
-    if 
-    title = str(df_reddit[df_reddit['post_id']==post]['title'].unique()[0])
-    sentiment = str(df_reddit[df_reddit['post_id']==post]['sentiment'].unique()[0])
+        post = main_graph_hover['points'][0]['customdata']
+        title = str(df_reddit[df_reddit['post_id']==post]['title'].unique()[0])
+        sentiment = str(df_reddit[df_reddit['post_id']==post]['sentiment'].unique()[0])
+        confidence = int(df_reddit[df_reddit['post_id']==post]['confidence'].unique()[0])
+    else:
+        post = ""
+        title = "No Post to Showcase"
+        sentiment = "NA"
+        confidence = 'NA'
     if sentiment == 'Negative':
         path = 'M 0.24 0.5 L 0.14 0.64 L 0.24 0.5 Z'
     elif sentiment == 'Positive':
         path = 'M 0.24 0.5 L 0.34 0.64 L 0.24 0.5 Z'
     else:
         path = 'M 0.24 0.5 L 0.24 0.75 L 0.24 0.5 Z'
-    confidence = int(df_reddit[df_reddit['post_id']==post]['confidence'].unique()[0])
     text = """ {}  | Sentiment: {}  |  confidence {}  
         """.format(title,sentiment,confidence)
-
     base_chart = {
     "values": [40, 20, 20, 20],
     "domain": {"x": [0, .48]},
@@ -383,7 +394,6 @@ def create_post_info(coin_select,date_filter,main_graph_hover):
         "textposition": "inside",
         "hoverinfo": "none"
         }
-
     layout = {
         'xaxis': {
             'showticklabels': False,
@@ -421,6 +431,7 @@ def create_post_info(coin_select,date_filter,main_graph_hover):
         ]
     }
     base_chart['marker']['line']['width'] = 0
+    print("END 5")
     return html.Div(
             [html.Div(
                 [
@@ -447,15 +458,20 @@ def create_post_info(coin_select,date_filter,main_graph_hover):
      dash.dependencies.Input('date_filter', 'value'),
      dash.dependencies.Input('mc_by_coin','hoverData')])
 def update_tabs(coin_select, date_filter,main_graph_hover):
+    print("Start 6")
     df_2 = filter_reddit(df_rt, coin_select, date_filter)
     df_reddit = filter_reddit(df_reddit_post, coin_select, date_filter)
     df_stg = pd.merge(left=df_2,right=df_reddit,how='inner',left_on='post_id',right_on='post_id')
     df_trends = df_stg.sort_values(['delta_minute']).reset_index(drop=True)
-    if main_graph_hover is None:
+    if main_graph_hover is None and len(df_trends) > 0:
         customdata=df_trends.max()['post_id']
-        print(customdata)
         main_graph_hover = {'points': [
             {'curveNumber': 3, 'pointNumber': 1, 'pointIndex': 1, 'x': '2018-03-14 14:06:13', 'y': 137, 'customdata':customdata }]}
+    else:
+        print("END 6")
+        return html.Div(
+            "No Post to show"
+        )
     posts = main_graph_hover['points'][0]['customdata']       
     data2 = [
         go.Scatter( 
@@ -479,22 +495,17 @@ def update_tabs(coin_select, date_filter,main_graph_hover):
         'data':data2,
         'layout':layout
         }
+    print("END 6")
     return html.Div([
             dcc.Graph(
             id='graph12',
             figure=figure1
         )
         ])
-
- 
-    
-
-
 #helper function for price data
 def filter_mc_df(df=None, coin_select=None, date_filter=None):
     date_cutoff = df.max()['insert_timestamp'] - pd.Timedelta(days=date_filter)
     #coin_filter
-    print(type(coin_select))
     if coin_select != None:
         df_stg = df[df['coin_name'].isin(coin_select)]
     #date_filter
